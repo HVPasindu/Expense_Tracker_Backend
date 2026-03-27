@@ -6,7 +6,8 @@ const verifyToken = require('../middleware/auth-middleware');
 
 const {
     uploadExpenseSlip,
-    getExpenseSlipsByExpenseId
+    getExpenseSlipsByExpenseId,
+    deleteExpenseSlipById
 } = require('../controllers/expense-slip-controller');
 
 // upload single file
@@ -18,5 +19,6 @@ router.post(
 );
 
 router.get('/:expenseId', verifyToken, getExpenseSlipsByExpenseId);
+router.delete('/slip/:slipId', verifyToken, deleteExpenseSlipById);
 
 module.exports = router;
