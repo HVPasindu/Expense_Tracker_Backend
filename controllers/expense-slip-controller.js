@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const connection = require('../db/db-connection');
 
 const uploadExpenseSlip = (req, res) => {
@@ -119,7 +121,71 @@ const getExpenseSlipsByExpenseId = (req, res) => {
     }
 };
 
+const deleteExpenseSlipById = (req, res) => {
+    try {
+        const userId = req.user.id;
+        const slipId = req.params.slipId;
+
+        const getSlipQuery = `
+            SELECT es.*, e.user_id
+            FROM expense_slips es
+            INNER JOIN expenses e ON es.expense_id = e.id
+            WHERE es.id = ? AND e.user_id = ?
+        `;
+
+        connection.query(getSlipQuery, [slipId, userId], (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    message: 'Database error while fetching expense slip',
+                    error: err.message
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({
+                    message: 'Expense slip not found'
+                });
+            }
+
+            const slip = results[0];
+            const filePath = slip.file_path;
+
+            const deleteSlipQuery = `
+                DELETE FROM expense_slips
+                WHERE id = ?
+            `;
+
+            connection.query(deleteSlipQuery, [slipId], (deleteErr) => {
+                if (deleteErr) {
+                    return res.status(500).json({
+                        message: 'Database error while deleting expense slip',
+                        error: deleteErr.message
+                    });
+                }
+
+                if (filePath) {
+                    fs.unlink(filePath, (fileErr) => {
+                        if (fileErr) {
+                            console.log('File delete error:', fileErr.message);
+                        }
+                    });
+                }
+
+                return res.status(200).json({
+                    message: 'Expense slip deleted successfully'
+                });
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     uploadExpenseSlip,
-    getExpenseSlipsByExpenseId
+    getExpenseSlipsByExpenseId,
+    deleteExpenseSlipById
 };
