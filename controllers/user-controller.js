@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const connection = require('../db/db-connection');
 const sendOtpEmail = require('../services/send-email');
+const jwt = require('jsonwebtoken');
 
 const registerUser = async (req, res) => {
     try {
@@ -291,8 +292,83 @@ const resendOtp = async (req, res) => {
     }
 };
 
+
+const loginUser = (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                message: 'Email and password are required'
+            });
+        }
+
+        const findUserQuery = 'SELECT * FROM users WHERE email = ?';
+
+        connection.query(findUserQuery, [email], async (findErr, results) => {
+            if (findErr) {
+                return res.status(500).json({
+                    message: 'Database error while finding user',
+                    error: findErr.message
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({
+                    message: 'User not found'
+                });
+            }
+
+            const user = results[0];
+
+            if (user.is_email_verified === 0) {
+                return res.status(403).json({
+                    message: 'Please verify your email before login'
+                });
+            }
+
+            const isPasswordMatch = await bcrypt.compare(password, user.password_hash);
+
+            if (!isPasswordMatch) {
+                return res.status(401).json({
+                    message: 'Invalid email or password'
+                });
+            }
+
+            const token = jwt.sign(
+                {
+                    id: user.id,
+                    email: user.email
+                },
+                process.env.JWT_SECRET,
+                {
+                    expiresIn: process.env.JWT_EXPIRES_IN || '1d'
+                }
+            );
+
+            return res.status(200).json({
+                message: 'Login successful',
+                token,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    phone_number: user.phone_number
+                }
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
 module.exports = {
     registerUser,
     verifyEmailOtp,
-    resendOtp
+    resendOtp,
+    loginUser
 };
