@@ -48,11 +48,26 @@ const getAllExpenses = (req, res) => {
     try {
         const userId = req.user.id;
 
+        // const getExpensesQuery = `
+        //     SELECT * FROM expenses
+        //     WHERE user_id = ?
+        //     ORDER BY expense_date DESC, id DESC
+        // `;
+
         const getExpensesQuery = `
-            SELECT * FROM expenses
-            WHERE user_id = ?
-            ORDER BY expense_date DESC, id DESC
-        `;
+    SELECT 
+        id,
+        user_id,
+        title,
+        amount,
+        DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+        note,
+        created_at,
+        updated_at
+    FROM expenses
+    WHERE user_id = ?
+    ORDER BY expense_date DESC, id DESC
+`;
 
         connection.query(getExpensesQuery, [userId], (err, results) => {
             if (err) {
@@ -81,10 +96,24 @@ const getExpenseById = (req, res) => {
         const userId = req.user.id;
         const expenseId = req.params.id;
 
+        // const getExpenseQuery = `
+        //     SELECT * FROM expenses
+        //     WHERE id = ? AND user_id = ?
+        // `;
+
         const getExpenseQuery = `
-            SELECT * FROM expenses
-            WHERE id = ? AND user_id = ?
-        `;
+    SELECT 
+        id,
+        user_id,
+        title,
+        amount,
+        DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+        note,
+        created_at,
+        updated_at
+    FROM expenses
+    WHERE id = ? AND user_id = ?
+`;
 
         connection.query(getExpenseQuery, [expenseId, userId], (err, results) => {
             if (err) {
@@ -225,10 +254,259 @@ const deleteExpenseById = (req, res) => {
     }
 };
 
+const getExpensesBySpecificDate = (req, res) => {
+    try {
+        const userId = req.user.id;
+        const expenseDate = req.params.expense_date;
+
+        // const getExpensesQuery = `
+        //     SELECT * FROM expenses
+        //     WHERE user_id = ? AND expense_date = ?
+        //     ORDER BY created_at DESC, id DESC
+        // `;
+
+
+        const getExpensesQuery = `
+    SELECT 
+        id,
+        user_id,
+        title,
+        amount,
+        DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+        note,
+        created_at,
+        updated_at
+    FROM expenses
+    WHERE user_id = ? AND expense_date = ?
+    ORDER BY created_at DESC, id DESC
+`;
+
+        connection.query(getExpensesQuery, [userId, expenseDate], (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    message: 'Database error while fetching expenses by date',
+                    error: err.message
+                });
+            }
+
+            // const totalAmount = results.reduce((sum, expense) => {
+            //     return sum + parseFloat(expense.amount);
+            // }, 0);
+
+            let totalAmount = 0;
+
+            for (const expense of results) {
+                totalAmount += parseFloat(expense.amount);
+            }
+
+            return res.status(200).json({
+                message: 'Expenses fetched successfully for the specific date',
+                expense_date: expenseDate,
+                total_amount: totalAmount,
+                expenses: results
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
+const getExpensesByDateRange = (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { start_date, end_date } = req.query;
+
+        if (!start_date || !end_date) {
+            return res.status(400).json({
+                message: 'Start date and end date are required'
+            });
+        }
+
+        if (start_date > end_date) {
+            return res.status(400).json({
+                message: 'Start date cannot be greater than end date'
+            });
+        }
+
+        const getExpensesQuery = `
+            SELECT 
+                id,
+                user_id,
+                title,
+                amount,
+                DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+                note,
+                created_at,
+                updated_at
+            FROM expenses
+            WHERE user_id = ? AND expense_date BETWEEN ? AND ?
+            ORDER BY expense_date DESC, id DESC
+        `;
+
+        connection.query(getExpensesQuery, [userId, start_date, end_date], (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    message: 'Database error while fetching expenses by date range',
+                    error: err.message
+                });
+            }
+
+            let totalAmount = 0;
+
+            for (const expense of results) {
+                totalAmount += parseFloat(expense.amount);
+            }
+
+            return res.status(200).json({
+                message: 'Expenses fetched successfully for the date range',
+                start_date,
+                end_date,
+                total_amount: totalAmount,
+                expenses: results
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
+const getWeeklyExpenses = (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { start_date, end_date } = req.query;
+
+        if (!start_date || !end_date) {
+            return res.status(400).json({
+                message: 'Start date and end date are required'
+            });
+        }
+
+        if (start_date > end_date) {
+            return res.status(400).json({
+                message: 'Start date cannot be greater than end date'
+            });
+        }
+
+        const getWeeklyExpensesQuery = `
+            SELECT 
+                id,
+                user_id,
+                title,
+                amount,
+                DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+                note,
+                created_at,
+                updated_at
+            FROM expenses
+            WHERE user_id = ? AND expense_date BETWEEN ? AND ?
+            ORDER BY expense_date DESC, id DESC
+        `;
+
+        connection.query(getWeeklyExpensesQuery, [userId, start_date, end_date], (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    message: 'Database error while fetching weekly expenses',
+                    error: err.message
+                });
+            }
+
+            let totalAmount = 0;
+
+            for (const expense of results) {
+                totalAmount += parseFloat(expense.amount);
+            }
+
+            return res.status(200).json({
+                message: 'Weekly expenses fetched successfully',
+                start_date,
+                end_date,
+                total_amount: totalAmount,
+                expenses: results
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
+const getMonthlyExpenses = (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { year, month } = req.query;
+
+        if (!year || !month) {
+            return res.status(400).json({
+                message: 'Year and month are required'
+            });
+        }
+
+        const getMonthlyExpensesQuery = `
+            SELECT 
+                id,
+                user_id,
+                title,
+                amount,
+                DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+                note,
+                created_at,
+                updated_at
+            FROM expenses
+            WHERE user_id = ?
+              AND YEAR(expense_date) = ?
+              AND MONTH(expense_date) = ?
+            ORDER BY expense_date DESC, id DESC
+        `;
+
+        connection.query(getMonthlyExpensesQuery, [userId, year, month], (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    message: 'Database error while fetching monthly expenses',
+                    error: err.message
+                });
+            }
+
+            let totalAmount = 0;
+
+            for (const expense of results) {
+                totalAmount += parseFloat(expense.amount);
+            }
+
+            return res.status(200).json({
+                message: 'Monthly expenses fetched successfully',
+                year,
+                month,
+                total_amount: totalAmount,
+                expenses: results
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     addExpense,
     getAllExpenses,
     getExpenseById,
     updateExpenseById,
-    deleteExpenseById
+    deleteExpenseById,
+    getExpensesBySpecificDate,
+    getExpensesByDateRange,
+    getWeeklyExpenses,
+    getMonthlyExpenses
 };
