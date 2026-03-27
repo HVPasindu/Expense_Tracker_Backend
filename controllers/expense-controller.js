@@ -44,42 +44,111 @@ const addExpense = (req, res) => {
 };
 
 
+// const getAllExpenses = (req, res) => {
+//     try {
+//         const userId = req.user.id;
+
+//         // const getExpensesQuery = `
+//         //     SELECT * FROM expenses
+//         //     WHERE user_id = ?
+//         //     ORDER BY expense_date DESC, id DESC
+//         // `;
+
+//         const getExpensesQuery = `
+//     SELECT 
+//         id,
+//         user_id,
+//         title,
+//         amount,
+//         DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+//         note,
+//         created_at,
+//         updated_at
+//     FROM expenses
+//     WHERE user_id = ?
+//     ORDER BY expense_date DESC, id DESC
+// `;
+
+//         connection.query(getExpensesQuery, [userId], (err, results) => {
+//             if (err) {
+//                 return res.status(500).json({
+//                     message: 'Database error while fetching expenses',
+//                     error: err.message
+//                 });
+//             }
+
+//             return res.status(200).json({
+//                 message: 'Expenses fetched successfully',
+//                 expenses: results
+//             });
+//         });
+//     } catch (error) {
+//         return res.status(500).json({
+//             message: 'Server error',
+//             error: error.message
+//         });
+//     }
+// };
+
+
 const getAllExpenses = (req, res) => {
     try {
         const userId = req.user.id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const offset = (page - 1) * limit;
 
-        // const getExpensesQuery = `
-        //     SELECT * FROM expenses
-        //     WHERE user_id = ?
-        //     ORDER BY expense_date DESC, id DESC
-        // `;
+        const countQuery = `
+            SELECT COUNT(*) AS total
+            FROM expenses
+            WHERE user_id = ?
+        `;
 
         const getExpensesQuery = `
-    SELECT 
-        id,
-        user_id,
-        title,
-        amount,
-        DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
-        note,
-        created_at,
-        updated_at
-    FROM expenses
-    WHERE user_id = ?
-    ORDER BY expense_date DESC, id DESC
-`;
+            SELECT 
+                id,
+                user_id,
+                title,
+                amount,
+                DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+                note,
+                created_at,
+                updated_at
+            FROM expenses
+            WHERE user_id = ?
+            ORDER BY expense_date DESC, id DESC
+            LIMIT ? OFFSET ?
+        `;
 
-        connection.query(getExpensesQuery, [userId], (err, results) => {
-            if (err) {
+        connection.query(countQuery, [userId], (countErr, countResults) => {
+            if (countErr) {
                 return res.status(500).json({
-                    message: 'Database error while fetching expenses',
-                    error: err.message
+                    message: 'Database error while counting expenses',
+                    error: countErr.message
                 });
             }
 
-            return res.status(200).json({
-                message: 'Expenses fetched successfully',
-                expenses: results
+            const totalItems = countResults[0].total;
+            const totalPages = Math.ceil(totalItems / limit);
+
+            connection.query(getExpensesQuery, [userId, limit, offset], (err, results) => {
+                if (err) {
+                    return res.status(500).json({
+                        message: 'Database error while fetching expenses',
+                        error: err.message
+                    });
+                }
+
+                return res.status(200).json({
+                    message: 'Expenses fetched successfully',
+                    pagination: {
+                        current_page: page,
+                        limit: limit,
+                        total_items: totalItems,
+                        total_pages: totalPages
+                    },
+                    expenses: results
+                });
             });
         });
     } catch (error) {
