@@ -366,9 +366,313 @@ const loginUser = (req, res) => {
 };
 
 
+// forgot password - send OTP
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                message: 'Email is required'
+            });
+        }
+
+        const findUserQuery = 'SELECT * FROM users WHERE email = ?';
+
+        connection.query(findUserQuery, [email], async (findErr, results) => {
+            if (findErr) {
+                return res.status(500).json({
+                    message: 'Database error while finding user',
+                    error: findErr.message
+                });
+            }
+
+            // security nisa generic response ekak danna puluwan
+            if (results.length === 0) {
+                return res.status(200).json({
+                    message: 'If an account exists, an OTP has been sent to the email'
+                });
+            }
+
+            const user = results[0];
+
+            const resetOtp = Math.floor(100000 + Math.random() * 900000).toString();
+            const resetOtpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+            const updateResetOtpQuery = `
+                UPDATE users
+                SET reset_otp = ?, reset_otp_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE email = ?
+            `;
+
+            connection.query(
+                updateResetOtpQuery,
+                [resetOtp, resetOtpExpiresAt, email],
+                async (updateErr) => {
+                    if (updateErr) {
+                        return res.status(500).json({
+                            message: 'Database error while saving reset OTP',
+                            error: updateErr.message
+                        });
+                    }
+
+                    try {
+                        await sendOtpEmail(email, resetOtp);
+
+                        return res.status(200).json({
+                            message: 'If an account exists, an OTP has been sent to the email'
+                        });
+                    } catch (emailErr) {
+                        return res.status(500).json({
+                            message: 'Failed to send reset OTP email',
+                            error: emailErr.message
+                        });
+                    }
+                }
+            );
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
+const verifyResetOtp = (req, res) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({
+                message: 'Email and OTP are required'
+            });
+        }
+
+        const findUserQuery = 'SELECT * FROM users WHERE email = ?';
+
+        connection.query(findUserQuery, [email], (findErr, results) => {
+            if (findErr) {
+                return res.status(500).json({
+                    message: 'Database error while finding user',
+                    error: findErr.message
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({
+                    message: 'User not found'
+                });
+            }
+
+            const user = results[0];
+
+            if (!user.reset_otp || !user.reset_otp_expires_at) {
+                return res.status(400).json({
+                    message: 'No reset OTP found'
+                });
+            }
+
+            if (user.reset_otp !== otp) {
+                return res.status(400).json({
+                    message: 'Invalid OTP'
+                });
+            }
+
+            const now = new Date();
+            const expiresAt = new Date(user.reset_otp_expires_at);
+
+            if (now > expiresAt) {
+                return res.status(400).json({
+                    message: 'OTP has expired'
+                });
+            }
+
+            const updateVerifyQuery = `
+                UPDATE users
+                SET is_reset_password_verified = 1,
+                    reset_otp = NULL,
+                    reset_otp_expires_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE email = ?
+            `;
+
+            connection.query(updateVerifyQuery, [email], (updateErr) => {
+                if (updateErr) {
+                    return res.status(500).json({
+                        message: 'Database error while verifying reset OTP',
+                        error: updateErr.message
+                    });
+                }
+
+                return res.status(200).json({
+                    message: 'OTP verified successfully'
+                });
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
+const resetPassword = async (req, res) => {
+    try {
+        const { email, new_password } = req.body;
+
+        if (!email || !new_password) {
+            return res.status(400).json({
+                message: 'Email and new password are required'
+            });
+        }
+
+        const findUserQuery = 'SELECT * FROM users WHERE email = ?';
+
+        connection.query(findUserQuery, [email], async (findErr, results) => {
+            if (findErr) {
+                return res.status(500).json({
+                    message: 'Database error while finding user',
+                    error: findErr.message
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({
+                    message: 'User not found'
+                });
+            }
+
+            const user = results[0];
+
+            if (user.is_reset_password_verified !== 1) {
+                return res.status(400).json({
+                    message: 'Reset password verification not completed'
+                });
+            }
+
+            const hashedPassword = await bcrypt.hash(new_password, 10);
+
+            const updatePasswordQuery = `
+                UPDATE users
+                SET password_hash = ?,
+                    is_reset_password_verified = 0,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE email = ?
+            `;
+
+            connection.query(
+                updatePasswordQuery,
+                [hashedPassword, email],
+                (updateErr) => {
+                    if (updateErr) {
+                        return res.status(500).json({
+                            message: 'Database error while resetting password',
+                            error: updateErr.message
+                        });
+                    }
+
+                    return res.status(200).json({
+                        message: 'Password reset successfully'
+                    });
+                }
+            );
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
+const resendResetOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                message: 'Email is required'
+            });
+        }
+
+        const findUserQuery = 'SELECT * FROM users WHERE email = ?';
+
+        connection.query(findUserQuery, [email], async (findErr, results) => {
+            if (findErr) {
+                return res.status(500).json({
+                    message: 'Database error while finding user',
+                    error: findErr.message
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({
+                    message: 'User not found'
+                });
+            }
+
+            const user = results[0];
+
+            const resetOtp = Math.floor(100000 + Math.random() * 900000).toString();
+            const resetOtpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+            const updateResetOtpQuery = `
+                UPDATE users
+                SET reset_otp = ?,
+                    reset_otp_expires_at = ?,
+                    is_reset_password_verified = 0,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE email = ?
+            `;
+
+            connection.query(
+                updateResetOtpQuery,
+                [resetOtp, resetOtpExpiresAt, email],
+                async (updateErr) => {
+                    if (updateErr) {
+                        return res.status(500).json({
+                            message: 'Database error while updating reset OTP',
+                            error: updateErr.message
+                        });
+                    }
+
+                    try {
+                        await sendOtpEmail(email, resetOtp);
+
+                        return res.status(200).json({
+                            message: 'New reset OTP sent successfully'
+                        });
+                    } catch (emailErr) {
+                        return res.status(500).json({
+                            message: 'Reset OTP updated, but failed to send email',
+                            error: emailErr.message
+                        });
+                    }
+                }
+            );
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
+
 module.exports = {
     registerUser,
     verifyEmailOtp,
     resendOtp,
-    loginUser
+    loginUser,
+    forgotPassword,
+    verifyResetOtp,
+    resetPassword,
+    resendResetOtp
 };
