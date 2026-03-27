@@ -499,6 +499,101 @@ const getMonthlyExpenses = (req, res) => {
     }
 };
 
+const getDashboardSummary = (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const totalExpensesQuery = `
+            SELECT COUNT(*) AS total_expenses,
+                   COALESCE(SUM(amount), 0) AS total_amount
+            FROM expenses
+            WHERE user_id = ?
+        `;
+
+        const todayExpensesQuery = `
+            SELECT COALESCE(SUM(amount), 0) AS today_total
+            FROM expenses
+            WHERE user_id = ? AND expense_date = CURDATE()
+        `;
+
+        const monthlyExpensesQuery = `
+            SELECT COALESCE(SUM(amount), 0) AS monthly_total
+            FROM expenses
+            WHERE user_id = ?
+              AND YEAR(expense_date) = YEAR(CURDATE())
+              AND MONTH(expense_date) = MONTH(CURDATE())
+        `;
+
+        const latestExpensesQuery = `
+            SELECT 
+                id,
+                user_id,
+                title,
+                amount,
+                DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+                note,
+                created_at,
+                updated_at
+            FROM expenses
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 5
+        `;
+
+        connection.query(totalExpensesQuery, [userId], (err1, totalResults) => {
+            if (err1) {
+                return res.status(500).json({
+                    message: 'Database error while fetching total expenses',
+                    error: err1.message
+                });
+            }
+
+            connection.query(todayExpensesQuery, [userId], (err2, todayResults) => {
+                if (err2) {
+                    return res.status(500).json({
+                        message: 'Database error while fetching today total',
+                        error: err2.message
+                    });
+                }
+
+                connection.query(monthlyExpensesQuery, [userId], (err3, monthlyResults) => {
+                    if (err3) {
+                        return res.status(500).json({
+                            message: 'Database error while fetching monthly total',
+                            error: err3.message
+                        });
+                    }
+
+                    connection.query(latestExpensesQuery, [userId], (err4, latestResults) => {
+                        if (err4) {
+                            return res.status(500).json({
+                                message: 'Database error while fetching latest expenses',
+                                error: err4.message
+                            });
+                        }
+
+                        return res.status(200).json({
+                            message: 'Dashboard summary fetched successfully',
+                            summary: {
+                                total_expenses: totalResults[0].total_expenses,
+                                total_amount: parseFloat(totalResults[0].total_amount),
+                                today_total: parseFloat(todayResults[0].today_total),
+                                monthly_total: parseFloat(monthlyResults[0].monthly_total),
+                                latest_expenses: latestResults
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     addExpense,
     getAllExpenses,
@@ -508,5 +603,6 @@ module.exports = {
     getExpensesBySpecificDate,
     getExpensesByDateRange,
     getWeeklyExpenses,
-    getMonthlyExpenses
+    getMonthlyExpenses,
+    getDashboardSummary
 };
