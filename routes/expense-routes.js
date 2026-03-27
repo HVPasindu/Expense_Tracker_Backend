@@ -9,12 +9,14 @@ const { addExpense,
     getExpensesBySpecificDate,
     getExpensesByDateRange,
     getWeeklyExpenses,
-    getMonthlyExpenses } = require('../controllers/expense-controller');
+    getMonthlyExpenses,
+    getDashboardSummary } = require('../controllers/expense-controller');
 const verifyToken = require('../middleware/auth-middleware');
 
 router.post('/', verifyToken, addExpense);
 router.get('/', verifyToken, getAllExpenses);
 
+router.get('/dashboard-summary', verifyToken, getDashboardSummary);
 router.get('/date-range', verifyToken, getExpensesByDateRange);
 router.get('/weekly', verifyToken, getWeeklyExpenses);
 router.get('/monthly', verifyToken, getMonthlyExpenses);
