@@ -2,11 +2,15 @@ require('dotenv').config();
 
 const express = require('express');
 const app = express();
+const cors = require('cors');
 const port = process.env.PORT || 3000;
 const userRoutes = require('./routes/user-routes');
 const expenseRoutes = require('./routes/expense-routes');
 const expenseSlipRoutes = require('./routes/expense-slip-routes');
 
+app.use(cors({
+    origin: 'http://localhost:5173'
+}));
 
 app.use(express.json());
 
