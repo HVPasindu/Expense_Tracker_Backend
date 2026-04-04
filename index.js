@@ -12,20 +12,17 @@ const expenseSlipRoutes = require('./routes/expense-slip-routes');
 
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://expense-tracker-delta-one-62.vercel.app',
-  process.env.CLIENT_URL
-].filter(Boolean);
+  'https://expense-tracker-delta-one-62.vercel.app'
+];
 
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
+    return callback(null, false);
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 app.use(express.json());
