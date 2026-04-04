@@ -17,7 +17,8 @@ const sendOtpEmail = async (toEmail, otpCode) => {
   });
 
   if (error) {
-    throw new Error(error.message || 'Failed to send email');
+    console.error('Resend error:', error);
+    throw new Error(error.message || JSON.stringify(error));
   }
 
   return data;
