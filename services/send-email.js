@@ -1,28 +1,26 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config();
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendOtpEmail = async (toEmail, otpCode) => {
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: toEmail,
-        subject: 'Your OTP Code',
-        html: `
-            <h2>Email Verification OTP</h2>
-            <p>Your OTP code is:</p>
-            <h1>${otpCode}</h1>
-            <p>This OTP will expire in 5 minutes.</p>
-        `
-    };
+  const { data, error } = await resend.emails.send({
+    from: 'onboarding@resend.dev',
+    to: [toEmail],
+    subject: 'Your OTP Code',
+    html: `
+      <h2>Email Verification OTP</h2>
+      <p>Your OTP code is:</p>
+      <h1>${otpCode}</h1>
+      <p>This OTP will expire in 5 minutes.</p>
+    `,
+  });
 
-    return transporter.sendMail(mailOptions);
+  if (error) {
+    throw new Error(error.message || 'Failed to send email');
+  }
+
+  return data;
 };
 
 module.exports = sendOtpEmail;
