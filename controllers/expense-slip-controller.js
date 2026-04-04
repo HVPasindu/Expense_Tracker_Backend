@@ -104,7 +104,7 @@ const getExpenseSlipsByExpenseId = (req, res) => {
 
                 const slips = results.map((slip) => ({
                     ...slip,
-                    file_url: `http://localhost:${process.env.PORT || 3000}/${slip.file_path.replace(/\\/g, '/')}`
+                    file_url: `${process.env.BASE_URL}/${slip.file_path.replace(/\\/g, '/')}`
                 }));
 
                 return res.status(200).json({

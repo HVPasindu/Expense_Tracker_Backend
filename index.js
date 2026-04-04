@@ -8,8 +8,14 @@ const userRoutes = require('./routes/user-routes');
 const expenseRoutes = require('./routes/expense-routes');
 const expenseSlipRoutes = require('./routes/expense-slip-routes');
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: 'http://localhost:5173'
+  origin: allowedOrigins,
+  credentials: true
 }));
 
 app.use(express.json());
