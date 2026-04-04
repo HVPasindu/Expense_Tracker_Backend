@@ -10,16 +10,22 @@ const userRoutes = require('./routes/user-routes');
 const expenseRoutes = require('./routes/expense-routes');
 const expenseSlipRoutes = require('./routes/expense-slip-routes');
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://expense-tracker-delta-one-62.vercel.app'
+];
+
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true
 }));
 
 app.use(express.json());
-
-app.get('/health', (req, res) => {
-  res.json({ ok: true, message: 'backend live' });
-});
 
 app.use('/users', userRoutes);
 app.use('/expenses', expenseRoutes);
